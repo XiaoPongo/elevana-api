@@ -20,6 +20,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.Optional;
+import com.elevana_api.model.Student;
+import java.security.Principal;
+import com.elevana_api.service.StudentService;
 
 @RestController
 @RequestMapping({"/api/classrooms"})
@@ -27,6 +31,8 @@ public class ClassroomController {
    private static final Logger logger = LoggerFactory.getLogger(ClassroomController.class);
    @Autowired
    private ClassroomService classroomService;
+   @Autowired
+   private StudentService studentService;
 
    @PostMapping
    public ResponseEntity<?> createClassroom(@RequestBody CreateClassroomRequest request, @AuthenticationPrincipal Jwt jwt) {
@@ -40,6 +46,41 @@ public class ClassroomController {
          logger.error("!!! ERROR creating classroom for mentorId: {}", mentorId, var5);
          return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "An unexpected error occurred."));
       }
+   }
+   
+   @PostMapping("/join")
+   public ResponseEntity<?> joinClassroom(@RequestBody Map<String, String> request,
+                                          @AuthenticationPrincipal Jwt jwt) {
+       String studentId = jwt.getSubject();
+       String classCode = request.get("classCode");
+
+       try {
+           Optional<Classroom> classroomOpt = classroomService.findByClassCode(classCode);
+           if (classroomOpt.isEmpty()) {
+               return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                    .body(Map.of("success", false, "message", "Invalid or expired code"));
+           }
+
+           Classroom classroom = classroomOpt.get();
+           if (!classroom.isAllowNewStudents()) {
+               return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                    .body(Map.of("success", false, "message", "Class does not allow new students"));
+           }
+
+           Student student = classroomService.addStudentToClassroom(studentId, classroom);
+           return ResponseEntity.ok(Map.of("success", true, "message", "Joined successfully", "classroom", classroom));
+
+       } catch (Exception e) {
+           return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                .body(Map.of("success", false, "message", "An unexpected error occurred"));
+       }
+   }
+   
+   @GetMapping("/api/student/classes")
+   public ResponseEntity<List<Classroom>> getStudentClasses(Principal principal) {
+       String studentId = principal.getName(); // assuming your Principal holds studentId
+       List<Classroom> classes = studentService.getStudentClasses(studentId);
+       return ResponseEntity.ok(classes);
    }
 
    @GetMapping

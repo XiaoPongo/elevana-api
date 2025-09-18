@@ -75,6 +75,23 @@ public class ClassroomService {
          }
       }
    }
+   
+   public Optional<Classroom> findByClassCode(String classCode) {
+	    return classroomRepository.findByClassCode(classCode);
+	}
+
+	@Transactional
+	public Student addStudentToClassroom(String studentId, Classroom classroom) {
+	    Student student = studentRepository.findById(studentId)
+	        .orElseThrow(() -> new RuntimeException("Student not found"));
+
+	    classroom.getStudents().add(student);
+	    student.getClassrooms().add(classroom);
+
+	    classroomRepository.save(classroom);
+	    return studentRepository.save(student);
+	}
+
 
    public Optional<Classroom> getClassroomForStudent(Long classId, String studentId) {
       return this.studentRepository.findById(studentId).flatMap((student) -> {
